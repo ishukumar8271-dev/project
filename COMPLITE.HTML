@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Rubik's Cube - ISHU KUMAR</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --bg-color-start: #0f172a; 
+            --bg-color-end: #1e293b;
+            --panel-bg: rgba(15, 23, 42, 0.85);
+            --text-color: #ffffff;
+            --accent-color: #ff5252;
+            --gold-color: #ffd700;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-color);
+            background: linear-gradient(to bottom, var(--bg-color-start), var(--bg-color-end));
+        }
+
+        /* 3D Canvas Container */
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            padding: 20px;
+        }
+
+        header {
+            pointer-events: auto;
+            text-align: center;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            letter-spacing: 1px;
+            background: linear-gradient(to right, #fff, #aaa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            margin: 5px 0 0;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        /* --- DEVELOPER CREDIT (TOP LEFT) --- */
+        .developer-badge {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(74, 144, 226, 0.3);
+            padding: 8px 15px;
+            border-radius: 8px;
+            pointer-events: auto;
+            z-index: 20; /* Above score panel if needed, or stacked */
+            box-shadow: 0 0 15px rgba(74, 144, 226, 0.1);
+        }
+
+        .dev-name {
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: var(--primary-color);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: linear-gradient(90deg, #4a90e2, #63b3ed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .dev-title {
+            font-size: 0.65rem;
+            color: #ccc;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-top: 2px;
+        }
+
+        /* --- SCORE HUD --- */
+        .score-panel {
+            position: absolute;
+            top: 85px; /* Moved down to fit Developer Badge */
+            left: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            padding: 10px 20px;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            pointer-events: auto;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.1);
+        }
+
+        .score-icon {
+            font-size: 1.5rem;
+            filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.8));
+        }
+
+        #score-val {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--gold-color);
+            min-width: 60px;
+            text-align: right;
+            font-family: 'Courier New', monospace;
+        }
+
+        .score-label {
+            font-size: 0.8rem;
+            color: #a8a3a7;
+            text-transform: uppercase;
+        }
+
+        /* --- CONTROLS WRAPPER (BOTTOM RIGHT) --- */
+        .controls-wrapper {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-end;
+            pointer-events: auto;
+        }
+
+        .zoom-controls {
+            display: flex;
+            gap: 10px;
+            background: var(--panel-bg);
+            padding: 8px;
+            border-radius: 30px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            line-height: 1;
+        }
+
+        .zoom-btn:hover { background: rgba(255,255,255,0.3); transform: scale(1.1); }
+        .zoom-btn:active { transform: scale(0.95); }
+
+        .controls-container {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border-radius: 16px;
+            padding: 15px;
+            width: 300px;
+            box-shadow: 0 8px 32px rgba(3, 135, 196, 0.5);
+            border: 1px solid rgba(228, 13, 13, 0.945);
+            transition: opacity 0.3s;
+        }
+
+        .controls-group {
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .controls-group:last-child { margin-bottom: 0; }
+
+        .label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            color: #d9f010;
+        }
+
+        .action-buttons { display: flex; gap: 8px; justify-content: center; }
+        .rotate-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+
+        .rotate-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            padding: 8px 0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .rotate-btn:hover:not(:disabled) { background: rgba(210, 231, 16, 0.25); }
+        .rotate-btn:active:not(:disabled) { transform: scale(0.95); }
+        .rotate-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .main-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-shuffle { background-color: var(--primary-color); color: white; }
+        .btn-shuffle:hover { background-color: #d5eb0e; }
+        .btn-solve { background-color: var(--accent-color); color: white; }
+        .btn-solve:hover { background-color: #d32f2f; }
+
+        .score-pop { animation: pop 0.3s ease-out; }
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.5); color: #fff; }
+            100% { transform: scale(1); }
+        }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 1.4rem; }
+            .controls-wrapper { width: 90%; right: 5%; align-items: center; }
+            .controls-container { width: 100%; }
+            
+            /* Stack badges vertically on small screens */
+            .developer-badge { top: 60px; left: 50%; transform: translateX(-50%); }
+            .score-panel { top: 120px; left: 50%; transform: translateX(-50%); }
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <header>
+            <h1>IK 3D Cube</h1>
+            <p class="subtitle">Drag to rotate • Scroll/Buttons to zoom</p>
+        </header>
+
+        <!-- DEVELOPER CREDIT (TOP LEFT) -->
+        <div class="developer-badge">
+            <div class="dev-name">ISHU KUMAR</div>
+            <div class="dev-title">DEVELOPER</div>
+        </div>
+
+        <!-- SCORE HUD (LEFT CORNER, BELOW DEVELOPER NAME) -->
+        <div class="score-panel">
+            <div class="score-icon">🪙</div>
+            <div>
+                <div id="score-val">0</div>
+                <div class="score-label">Coins</div>
+            </div>
+        </div>
+
+        <!-- Bottom Right Wrapper -->
+        <div class="controls-wrapper">
+            
+            <div class="zoom-controls">
+                <button class="zoom-btn" id="zoom-in" title="Zoom In">+</button>
+                <button class="zoom-btn" id="zoom-out" title="Zoom Out">−</button>
+            </div>
+
+            <div class="controls-container">
+                <div class="controls-group">
+                    <span class="label">Actions</span>
+                    <div class="action-buttons">
+                        <button class="main-btn btn-shuffle" id="btn-shuffle">Shuffle (+10)</button>
+                        <button class="main-btn btn-solve" id="btn-solve">Solve (+100)</button>
+                    </div>
+                </div>
+
+                <div class="controls-group">
+                    <span class="label">Manual (+1)</span>
+                    <div class="rotate-grid">
+                        <button class="rotate-btn" data-axis="y" data-layer="-1" data-dir="1">L</button>
+                        <button class="rotate-btn" data-axis="y" data-layer="0" data-dir="1">M</button>
+                        <button class="rotate-btn" data-axis="y" data-layer="1" data-dir="-1">R</button>
+                        <button class="rotate-btn" data-axis="x" data-layer="-1" data-dir="-1">U</button>
+                        <button class="rotate-btn" data-axis="x" data-layer="0" data-dir="1">E</button>
+                        <button class="rotate-btn" data-axis="x" data-layer="1" data-dir="1">D</button>
+                        <button class="rotate-btn" data-axis="z" data-layer="-1" data-dir="1">F</button>
+                        <button class="rotate-btn" data-axis="z" data-layer="0" data-dir="1">S</button>
+                        <button class="rotate-btn" data-axis="z" data-layer="1" data-dir="-1">B</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+        // --- Configuration ---
+        const CUBE_SIZE = 1;
+        const SPACING = 0.02; 
+        const ANIMATION_SPEED = 300; 
+        const SHUFFLE_MOVES = 20;
+        const SHUFFLE_SPEED = 100; 
+
+        // Colors
+        const COLORS = {
+            base: 0x111111,
+            R: 0xb90000, L: 0xff5900, U: 0xffffff, 
+            D: 0xffd500, F: 0x009e60, B: 0x0045ad  
+        };
+
+        // Game State
+        let isAnimating = false;
+        let moveHistory = []; 
+        let score = 0;
+        const cubies = []; 
+        const bgCoins = [];
+
+        // --- Three.js Setup ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        
+        const bgColor = new THREE.Color(0x0f172a);
+        scene.background = bgColor;
+        scene.fog = new THREE.FogExp2(0x0f172a, 0.035);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(5, 5, 7);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.enablePan = false;
+        controls.minDistance = 3;
+        controls.maxDistance = 15;
+
+        // --- Lighting ---
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.9);
+        scene.add(hemiLight);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        dirLight.position.set(10, 15, 10);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        scene.add(dirLight);
+
+        const fillLight = new THREE.PointLight(0x4a90e2, 0.8);
+        fillLight.position.set(-10, -5, -10);
+        scene.add(fillLight);
+
+        const rimLight = new THREE.PointLight(0xffaa00, 0.5);
+        rimLight.position.set(0, 0, -10);
+        scene.add(rimLight);
+
+        // --- Background Coins ---
+        function initBackgroundCoins() {
+            const coinGeo = new THREE.TorusGeometry(0.4, 0.1, 8, 24);
+            const coinMat = new THREE.MeshStandardMaterial({ 
+                color: 0xffd700, metalness: 1.0, roughness: 0.3,
+                emissive: 0xaa6600, emissiveIntensity: 0.2
+            });
+            const numCoins = 25;
+            for(let i=0; i<numCoins; i++) {
+                const coin = new THREE.Mesh(coinGeo, coinMat);
+                coin.position.x = (Math.random() - 0.5) * 20;
+                coin.position.y = (Math.random() - 0.5) * 20;
+                coin.position.z = -5 - Math.random() * 10;
+                coin.rotation.x = Math.random() * Math.PI;
+                coin.rotation.y = Math.random() * Math.PI;
+                coin.userData = {
+                    speedY: 0.01 + Math.random() * 0.02,
+                    rotSpeed: 0.02 + Math.random() * 0.03
+                };
+                scene.add(coin);
+                bgCoins.push(coin);
+            }
+        }
+
+        // --- Cube Geometry ---
+        function createStickerTexture(colorHex) {
+            const size = 256;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, size, size);
+            const pad = 30;
+            ctx.fillStyle = '#' + new THREE.Color(colorHex).getHexString();
+            ctx.beginPath();
+            ctx.roundRect(pad, pad, size - pad*2, size - pad*2, 20);
+            ctx.fill();
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, "rgba(255,255,255,0.2)");
+            gradient.addColorStop(1, "rgba(255,255,255,0)");
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            return tex;
+        }
+
+        const materials = [
+            new THREE.MeshStandardMaterial({ map: createStickerTexture(COLORS.R), roughness: 0.2, metalness: 0.1 }), 
+            new THREE.MeshStandardMaterial({ map: createStickerTexture(COLORS.L), roughness: 0.2, metalness: 0.1 }), 
+            new THREE.MeshStandardMaterial({ map: createStickerTexture(COLORS.U), roughness: 0.2, metalness: 0.1 }), 
+            new THREE.MeshStandardMaterial({ map: createStickerTexture(COLORS.D), roughness: 0.2, metalness: 0.1 }), 
+            new THREE.MeshStandardMaterial({ map: createStickerTexture(COLORS.F), roughness: 0.2, metalness: 0.1 }), 
+            new THREE.MeshStandardMaterial({ map: createStickerTexture(COLORS.B), roughness: 0.2, metalness: 0.1 }), 
+        ];
+
+        const geometry = new RoundedBoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE, 4, 0.1);
+
+        for (let x = -1; x <= 1; x++) {
+            for (let y = -1; y <= 1; y++) {
+                for (let z = -1; z <= 1; z++) {
+                    const materialsCopy = materials.map(m => m.clone());
+                    const mesh = new THREE.Mesh(geometry, materialsCopy);
+                    mesh.position.set(x * (CUBE_SIZE + SPACING), y * (CUBE_SIZE + SPACING), z * (CUBE_SIZE + SPACING));
+                    mesh.userData = { initialX: x, initialY: y, initialZ: z };
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    scene.add(mesh);
+                    cubies.push(mesh);
+                }
+            }
+        }
+
+        // --- Logic: Rotation ---
+        const pivot = new THREE.Object3D();
+        pivot.rotation.order = 'XYZ';
+        scene.add(pivot);
+
+        async function rotateLayer(axis, index, direction, duration = ANIMATION_SPEED, record = true) {
+            if (isAnimating) return;
+            isAnimating = true;
+
+            const epsilon = 0.1;
+            const targetCubies = [];
+            const coordinate = index * (CUBE_SIZE + SPACING);
+
+            cubies.forEach(cube => {
+                if (Math.abs(cube.position[axis] - coordinate) < epsilon) targetCubies.push(cube);
+            });
+
+            pivot.rotation.set(0, 0, 0);
+            pivot.position.set(0, 0, 0);
+            targetCubies.forEach(cube => pivot.attach(cube));
+
+            const targetRotation = (Math.PI / 2) * direction * -1;
+            
+            await new Promise(resolve => {
+                const startTime = performance.now();
+                function animate() {
+                    const now = performance.now();
+                    const progress = Math.min((now - startTime) / duration, 1);
+                    const ease = 1 - Math.pow(1 - progress, 3);
+                    pivot.rotation[axis] = targetRotation * ease;
+                    if (progress < 1) requestAnimationFrame(animate);
+                    else resolve();
+                }
+                animate();
+            });
+
+            pivot.updateMatrixWorld();
+            targetCubies.forEach(cube => {
+                scene.attach(cube);
+                cube.position.x = Math.round(cube.position.x / (CUBE_SIZE + SPACING)) * (CUBE_SIZE + SPACING);
+                cube.position.y = Math.round(cube.position.y / (CUBE_SIZE + SPACING)) * (CUBE_SIZE + SPACING);
+                cube.position.z = Math.round(cube.position.z / (CUBE_SIZE + SPACING)) * (CUBE_SIZE + SPACING);
+                cube.rotation.x = Math.round(cube.rotation.x / (Math.PI/2)) * (Math.PI/2);
+                cube.rotation.y = Math.round(cube.rotation.y / (Math.PI/2)) * (Math.PI/2);
+                cube.rotation.z = Math.round(cube.rotation.z / (Math.PI/2)) * (Math.PI/2);
+                cube.updateMatrixWorld();
+            });
+
+            pivot.rotation.set(0,0,0);
+
+            if (record) {
+                moveHistory.push({ axis, index, direction });
+                updateScore(1);
+            }
+            isAnimating = false;
+        }
+
+        async function shuffleCube() {
+            if (isAnimating) return;
+            moveHistory = []; 
+            const axes = ['x', 'y', 'z'];
+            const indices = [-1, 0, 1];
+            const dirs = [1, -1];
+            for (let i = 0; i < SHUFFLE_MOVES; i++) {
+                const axis = axes[Math.floor(Math.random() * axes.length)];
+                const index = indices[Math.floor(Math.random() * indices.length)];
+                const dir = dirs[Math.floor(Math.random() * dirs.length)];
+                await rotateLayer(axis, index, dir, SHUFFLE_SPEED, true);
+            }
+            updateScore(10);
+        }
+
+        async function solveCube() {
+            if (isAnimating) return;
+            if (moveHistory.length === 0) return;
+            while (moveHistory.length > 0) {
+                const move = moveHistory.pop();
+                await rotateLayer(move.axis, move.index, move.direction * -1, ANIMATION_SPEED, false);
+            }
+            updateScore(100);
+        }
+
+        // --- Controls Interactions ---
+        document.querySelectorAll('.rotate-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const axis = btn.dataset.axis;
+                const layer = parseInt(btn.dataset.layer);
+                const dir = parseInt(btn.dataset.dir);
+                rotateLayer(axis, layer, dir);
+            });
+        });
+
+        document.getElementById('btn-shuffle').addEventListener('click', shuffleCube);
+        document.getElementById('btn-solve').addEventListener('click', solveCube);
+
+        function handleZoom(factor) {
+            const target = controls.target;
+            const currentPosition = camera.position.clone();
+            const direction = new THREE.Vector3().subVectors(currentPosition, target).normalize();
+            const currentDistance = currentPosition.distanceTo(target);
+            const newDistance = currentDistance * factor;
+            if (newDistance < controls.minDistance || newDistance > controls.maxDistance) return;
+            const newPosition = target.clone().add(direction.multiplyScalar(newDistance));
+            camera.position.copy(newPosition);
+            controls.update();
+        }
+
+        document.getElementById('zoom-in').addEventListener('click', () => handleZoom(0.8));
+        document.getElementById('zoom-out').addEventListener('click', () => handleZoom(1.2));
+
+        // --- Score & Animation ---
+        function updateScore(amount) {
+            score += amount;
+            const scoreEl = document.getElementById('score-val');
+            scoreEl.innerText = score;
+            scoreEl.classList.remove('score-pop');
+            void scoreEl.offsetWidth;
+            scoreEl.classList.add('score-pop');
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            bgCoins.forEach(coin => {
+                coin.position.y += coin.userData.speedY;
+                coin.rotation.z += coin.userData.rotSpeed;
+                coin.rotation.x += coin.userData.rotSpeed * 0.5;
+                if (coin.position.y > 10) {
+                    coin.position.y = -10;
+                    coin.position.x = (Math.random() - 0.5) * 20;
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        initBackgroundCoins();
+        animate();
+
+    </script>
+</body>
+</html>
